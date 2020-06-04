@@ -4,6 +4,7 @@ Platform that will perform object detection.
 from collections import namedtuple, Counter
 import io
 import logging
+import os
 import re
 import time
 from pathlib import Path
@@ -30,6 +31,8 @@ from homeassistant.util.pil import draw_box
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_NAME
 
 _LOGGER = logging.getLogger(__name__)
+
+TEST_FILE = '/config/www/camera_snapshot/test_person.jpg'
 
 CONF_REGION = "region_name"
 CONF_ACCESS_KEY_ID = "aws_access_key_id"
@@ -142,6 +145,11 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 Box = namedtuple("Box", "y_min x_min y_max x_max")
 Point = namedtuple("Point", "y x")
 
+def file_exists(path):
+    return Path(os.path.expanduser(path)).exists()
+
+def in_test_mode():
+    return file_exists('/tmp/REKOG_TEST_MODE')
 
 def point_in_box(box: Box, point: Point) -> bool:
     """Return true if point lies in box"""
@@ -354,6 +362,14 @@ class ObjectDetection(ImageProcessingEntity):
 
     def process_image(self, image):
         """Process an image."""
+        if in_test_mode():
+            _LOGGER.debug("Overriding camera image with %s", TEST_FILE)
+            pil_image = Image.open(TEST_FILE)
+
+            with io.BytesIO() as output:
+                pil_image.save(output, format="JPEG")
+                image = output.getvalue()
+
         self._image = Image.open(io.BytesIO(bytearray(image)))  # used for saving only
         self._image_width, self._image_height = self._image.size
 
